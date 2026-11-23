@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Market Barkod Okuyucu</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 16px;
+      background: #f5f6f8;
+      color: #1f2937;
+    }
+    h1 { font-size: 1.35rem; margin-bottom: 12px; }
+    #reader {
+      width: 100%;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .barcode-badge {
+      display: inline-block;
+      background: #eef2ff;
+      color: #3730a3;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      margin-bottom: 8px;
+    }
+    input, textarea, button {
+      width: 100%;
+      box-sizing: border-box;
+      margin-top: 8px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+    input, textarea {
+      border: 1px solid #d1d5db;
+    }
+    button {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: #4b5563;
+      margin-top: 10px;
+    }
+    .hidden { display: none; }
+    .muted { color: #6b7280; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <h1>Market Barkod Okuyucu</h1>
+  <p class="muted">Kamerayı ürün barkoduna tutun. Kayıtlı değilse açıklamayı ekleyip kaydedebilirsiniz.</p>
+
+  <div id="reader"></div>
+
+  <div id="resultCard" class="card hidden">
+    <div id="scannedCode" class="barcode-badge"></div>
+    <div id="foundView" class="hidden">
+      <h2 id="productTitle" style="margin: 6px 0;"></h2>
+      <p id="productDesc" style="margin: 6px 0 12px;"></p>
+    </div>
+
+    <div id="addFormView" class="hidden">
+      <p class="muted">Bu barkod henüz kayıtlı değil. Ürün bilgilerini ekleyin:</p>
+      <input id="newTitle" type="text" placeholder="Ürün adı (örn. Tam Yağlı Süt 1L)" />
+      <textarea id="newDesc" rows="3" placeholder="Açıklama veya not (örn. Kahvaltı için alındı, laktozsuz değil)"></textarea>
+      <button id="saveBtn">Ürünü Kaydet</button>
+    </div>
+
+    <button id="scanAgainBtn" class="secondary">Yeni Barkod Oku</button>
+  </div>
+
+  <script>
+    const STORAGE_KEY = "market_urunleri_v1";
+
+    const varsayilanUrunler = {
+      "8690000000017": {
+        title: "Örnek Zeytinyağı 1L",
+        desc: "Sızma zeytinyağı; salata ve kızartma dışı kullanım için not alındı."
+      }
+    };
+
+    function urunleriGetir() {
+      const kayitli = localStorage.getItem(STORAGE_KEY);
+      if (!kayitli) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(varsayilanUrunler));
+        return { ...varsayilanUrunler };
+      }
+      return JSON.parse(kayitli);
+    }
+
+    function urunleriKaydet(urunler) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(urunler));
+    }
+
+    const html5QrCode = new Html5Qrcode("reader");
+    let aktifBarkod = null;
+
+    const resultCard = document.getElementById("resultCard");
+    const scannedCode = document.getElementById("scannedCode");
+    const foundView = document.getElementById("foundView");
+    const addFormView = document.getElementById("addFormView");
+    const productTitle = document.getElementById("productTitle");
+    const productDesc = document.getElementById("productDesc");
+    const newTitle = document.getElementById("newTitle");
+    const newDesc = document.getElementById("newDesc");
+
+    async function taramayiBaslat() {
+      resultCard.classList.add("hidden");
+      foundView.classList.add("hidden");
+      addFormView.classList.add("hidden");
+      newTitle.value = "";
+      newDesc.value = "";
+
+      try {
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 260, height: 140 } },
+          (decodedText) => {
+            barkodBulundu(decodedText.trim());
+          },
+          () => {}
+        );
+      } catch (err) {
+        resultCard.classList.remove("hidden");
+        scannedCode.textContent = "Kamera Hatası";
+        foundView.classList.remove("hidden");
+        productTitle.textContent = "Kameraya erişilemedi";
+        productDesc.textContent = "Sayfanın HTTPS üzerinden açıldığından ve tarayıcı kamera izninin verildiğinden emin olun. (" + err + ")";
+      }
+    }
+
+    async function barkodBulundu(kod) {
+      aktifBarkod = kod;
+      try {
+        await html5QrCode.stop();
+      } catch (_) {}
+
+      const urunler = urunleriGetir();
+      resultCard.classList.remove("hidden");
+      scannedCode.textContent = "Barkod: " + kod;
+
+      if (urunler[kod]) {
+        foundView.classList.remove("hidden");
+        addFormView.classList.add("hidden");
+        productTitle.textContent = urunler[kod].title;
+        productDesc.textContent = urunler[kod].desc || "Açıklama girilmemiş.";
+      } else {
+        foundView.classList.add("hidden");
+        addFormView.classList.remove("hidden");
+      }
+    }
+
+    document.getElementById("saveBtn").addEventListener("click", () => {
+      const baslik = newTitle.value.trim();
+      const aciklama = newDesc.value.trim();
+      if (!baslik) {
+        alert("Lütfen en azından bir ürün adı girin.");
+        return;
+      }
+      const urunler = urunleriGetir();
+      urunler[aktifBarkod] = { title: baslik, desc: aciklama };
+      urunleriKaydet(urunler);
+
+      addFormView.classList.add("hidden");
+      foundView.classList.remove("hidden");
+      productTitle.textContent = baslik;
+      productDesc.textContent = aciklama || "Açıklama girilmemiş.";
+    });
+
+    document.getElementById("scanAgainBtn").addEventListener("click", () => {
+      taramayiBaslat();
+    });
+
+    taramayiBaslat();
+  </script>
+</body>
+</html>
