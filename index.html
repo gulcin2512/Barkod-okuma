@@ -38,6 +38,11 @@
       font-size: 0.9rem;
       margin-bottom: 8px;
     }
+    #productDesc {
+      margin: 6px 0 12px;
+      white-space: pre-line;
+      line-height: 1.45;
+    }
     input, textarea, button {
       width: 100%;
       box-sizing: border-box;
@@ -45,9 +50,14 @@
       padding: 10px 12px;
       border-radius: 8px;
       font-size: 1rem;
+      font-family: inherit;
     }
     input, textarea {
       border: 1px solid #d1d5db;
+    }
+    textarea {
+      min-height: 130px;
+      resize: vertical;
     }
     button {
       background: #2563eb;
@@ -62,6 +72,12 @@
     }
     .hidden { display: none; }
     .muted { color: #6b7280; font-size: 0.9rem; }
+    .char-counter {
+      text-align: right;
+      color: #6b7280;
+      font-size: 0.85rem;
+      margin-top: 4px;
+    }
   </style>
 </head>
 <body>
@@ -74,13 +90,14 @@
     <div id="scannedCode" class="barcode-badge"></div>
     <div id="foundView" class="hidden">
       <h2 id="productTitle" style="margin: 6px 0;"></h2>
-      <p id="productDesc" style="margin: 6px 0 12px;"></p>
+      <p id="productDesc"></p>
     </div>
 
     <div id="addFormView" class="hidden">
       <p class="muted">Bu barkod henüz kayıtlı değil. Ürün bilgilerini ekleyin:</p>
-      <input id="newTitle" type="text" placeholder="Ürün adı (örn. Tam Yağlı Süt 1L)" />
-      <textarea id="newDesc" rows="3" placeholder="Açıklama veya not (örn. Kahvaltı için alındı, laktozsuz değil)"></textarea>
+      <input id="newTitle" type="text" maxlength="150" placeholder="Ürün adı (örn. Tam Yağlı Süt 1L)" />
+      <textarea id="newDesc" rows="6" maxlength="1000" placeholder="Açıklama veya not (içindekiler, kullanım notu, saklama koşulu vb.)"></textarea>
+      <div id="descCounter" class="char-counter">0 / 1000 karakter</div>
       <button id="saveBtn">Ürünü Kaydet</button>
     </div>
 
@@ -89,6 +106,7 @@
 
   <script>
     const STORAGE_KEY = "market_urunleri_v1";
+    const MAX_DESC_CHARS = 1000;
 
     const varsayilanUrunler = {
       "8690000000017": {
@@ -121,6 +139,13 @@
     const productDesc = document.getElementById("productDesc");
     const newTitle = document.getElementById("newTitle");
     const newDesc = document.getElementById("newDesc");
+    const descCounter = document.getElementById("descCounter");
+
+    function sayaciGuncelle() {
+      descCounter.textContent = `${newDesc.value.length} / ${MAX_DESC_CHARS} karakter`;
+    }
+
+    newDesc.addEventListener("input", sayaciGuncelle);
 
     async function taramayiBaslat() {
       resultCard.classList.add("hidden");
@@ -128,6 +153,7 @@
       addFormView.classList.add("hidden");
       newTitle.value = "";
       newDesc.value = "";
+      sayaciGuncelle();
 
       try {
         await html5QrCode.start(
